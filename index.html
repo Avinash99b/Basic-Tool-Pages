@@ -1,1 +1,151 @@
-Init
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Kana Trainer</title>
+<style>
+    body {margin:0;font-family:"Inter",sans-serif;background:#0f0f0f;color:white;}
+    h1 {text-align:center;margin-top:20px;}
+    .container {max-width:1000px;margin:auto;padding:20px;}
+    .controls {display:flex;gap:10px;justify-content:center;margin-bottom:20px;}
+    button,input {background:#1f1f1f;border:1px solid #333;color:white;padding:10px;border-radius:10px;cursor:pointer;}
+    .row {margin-bottom:20px;padding:15px;background:#151515;border-radius:16px;}
+    .row-title {display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+    .sub-title {font-size:12px;opacity:0.6;margin:5px 0;display:flex;justify-content:space-between;align-items:center;}
+    .grid {display:flex;gap:10px;flex-wrap:wrap;}
+    .card {background:#1a1a1a;padding:15px;border-radius:12px;cursor:pointer;font-size:22px;border:2px solid transparent;min-width:60px;text-align:center;}
+    .card.selected {border:2px solid #00d4ff;background:#111;}
+    .overlay {position:fixed;inset:0;background:black;display:none;align-items:center;justify-content:center;flex-direction:column;}
+    .char {font-size:120px;opacity:0;transform:scale(0.8);transition:0.4s;}
+    .char.show {opacity:1;transform:scale(1);}
+    .romaji {margin-top:20px;font-size:28px;}
+    .close {position:absolute;top:20px;right:25px;font-size:30px;cursor:pointer;}
+</style>
+</head>
+<body>
+<h1>✨ Kana Trainer</h1>
+<div class="container">
+    <div class="controls">
+        <input type="number" id="delay" value="2" min="1"> 
+        <button onclick="start()">Start</button>
+    </div>
+    <div id="rows"></div>
+</div>
+<div class="overlay" id="overlay">
+    <div class="close" onclick="stop()">✕</div>
+    <div class="char" id="char"></div>
+    <div class="romaji" id="romaji"></div>
+</div>
+<script>
+
+const kana={a:{hira:[["あ","a"],["い","i"],["う","u"],["え","e"],["お","o"]],kata:[["ア","a"],["イ","i"],["ウ","u"],["エ","e"],["オ","o"]]},
+k:{hira:[["か","ka"],["き","ki"],["く","ku"],["け","ke"],["こ","ko"]],kata:[["カ","ka"],["キ","ki"],["ク","ku"],["ケ","ke"],["コ","ko"]]},
+s:{hira:[["さ","sa"],["し","shi"],["す","su"],["せ","se"],["そ","so"]],kata:[["サ","sa"],["シ","shi"],["ス","su"],["セ","se"],["ソ","so"]]},
+t:{hira:[["た","ta"],["ち","chi"],["つ","tsu"],["て","te"],["と","to"]],kata:[["タ","ta"],["チ","chi"],["ツ","tsu"],["テ","te"],["ト","to"]]},
+n:{hira:[["な","na"],["に","ni"],["ぬ","nu"],["ね","ne"],["の","no"]],kata:[["ナ","na"],["ニ","ni"],["ヌ","nu"],["ネ","ne"],["ノ","no"]]},
+h:{hira:[["は","ha"],["ひ","hi"],["ふ","fu"],["へ","he"],["ほ","ho"]],kata:[["ハ","ha"],["ヒ","hi"],["フ","fu"],["ヘ","he"],["ホ","ho"]]},
+m:{hira:[["ま","ma"],["み","mi"],["む","mu"],["め","me"],["も","mo"]],kata:[["マ","ma"],["ミ","mi"],["ム","mu"],["メ","me"],["モ","mo"]]},
+y:{hira:[["や","ya"],["ゆ","yu"],["よ","yo"]],kata:[["ヤ","ya"],["ユ","yu"],["ヨ","yo"]]},
+r:{hira:[["ら","ra"],["り","ri"],["る","ru"],["れ","re"],["ろ","ro"]],kata:[["ラ","ra"],["リ","ri"],["ル","ru"],["レ","re"],["ロ","ro"]]},
+w:{hira:[["わ","wa"],["を","wo"],["ん","n"]],kata:[["ワ","wa"],["ヲ","wo"],["ン","n"]]}};
+
+let selected=[];
+let running=false;
+let interval;
+
+function toggle(char,romaji,el){
+ if(el.classList.contains('selected')){
+  el.classList.remove('selected');
+  selected=selected.filter(c=>c[0]!==char);
+ }else{
+  el.classList.add('selected');
+  selected.push([char,romaji]);
+ }
+}
+
+function groupToggle(chars,checked){
+ chars.forEach(([char,romaji])=>{
+  if(checked){
+   if(!selected.find(c=>c[0]===char)) selected.push([char,romaji]);
+  }else{
+   selected=selected.filter(c=>c[0]!==char);
+  }
+ });
+ render();
+}
+
+function createCard(char,romaji){
+ const div=document.createElement('div');
+ div.className='card';
+ div.innerText=char;
+ if(selected.find(c=>c[0]===char)) div.classList.add('selected');
+ div.onclick=()=>toggle(char,romaji,div);
+ return div;
+}
+
+function render(){
+ const container=document.getElementById('rows');
+ container.innerHTML='';
+
+ Object.entries(kana).forEach(([rowKey,rowData])=>{
+  const rowDiv=document.createElement('div');
+  rowDiv.className='row';
+
+  const title=document.createElement('div');
+  title.className='row-title';
+  title.innerHTML=`<span>${rowKey.toUpperCase()} ROW</span>`;
+
+  const hiraTitle=document.createElement('div');
+  hiraTitle.className='sub-title';
+  hiraTitle.innerHTML=`Hiragana <input type="checkbox" onchange="groupToggle(kana['${rowKey}'].hira,this.checked)">`;
+
+  const hiraGrid=document.createElement('div');
+  hiraGrid.className='grid';
+  rowData.hira.forEach(c=>hiraGrid.appendChild(createCard(...c)));
+
+  const kataTitle=document.createElement('div');
+  kataTitle.className='sub-title';
+  kataTitle.innerHTML=`Katakana <input type="checkbox" onchange="groupToggle(kana['${rowKey}'].kata,this.checked)">`;
+
+  const kataGrid=document.createElement('div');
+  kataGrid.className='grid';
+  rowData.kata.forEach(c=>kataGrid.appendChild(createCard(...c)));
+
+  rowDiv.appendChild(title);
+  rowDiv.appendChild(hiraTitle);
+  rowDiv.appendChild(hiraGrid);
+  rowDiv.appendChild(kataTitle);
+  rowDiv.appendChild(kataGrid);
+
+  container.appendChild(rowDiv);
+ });
+}
+
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+
+function start(){
+ if(selected.length===0)return alert('Select characters!');
+ running=true;
+ document.getElementById('overlay').style.display='flex';
+ let pool=shuffle([...selected]);
+ let i=0;
+ const delay=document.getElementById('delay').value*1000;
+ interval=setInterval(()=>{
+  if(!running)return;
+  if(i>=pool.length){pool=shuffle([...selected]);i=0;}
+  const [char,romaji]=pool[i];
+  const c=document.getElementById('char');
+  const r=document.getElementById('romaji');
+  c.classList.remove('show');r.innerText='';
+  setTimeout(()=>{c.innerText=char;c.classList.add('show');},100);
+  setTimeout(()=>{r.innerText=romaji;},delay);
+  i++;
+ },delay+1500);
+}
+
+function stop(){running=false;clearInterval(interval);document.getElementById('overlay').style.display='none';}
+
+render();
+</script>
+</body>
+</html>
